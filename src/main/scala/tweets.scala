@@ -6,26 +6,21 @@ import scalaz.stream._; import Process._
 import twitter4j._
 import twitter4j.conf.{Configuration => TwitterConfig, ConfigurationBuilder}
 
-object tweets extends App with TwitterSource {
+object tweets extends App
+    with TwitterSource
+    with Configuration {
+
   val outputTweets =
-    tweets(twitterConfig)
+    tweetsR(twitterConfig)
       .map(_.getText)
       .to(io.stdOutLines)
 
   outputTweets.run.run
-
-  lazy val twitterConfig =
-    new ConfigurationBuilder()
-      .setOAuthConsumerKey("WyZZczRFm9ge3bn9JMMzQ")
-      .setOAuthConsumerSecret("VRY1PtmGVq0jKOakyhn7xNhbVwXF2lp5rsAh6dIg")
-      .setOAuthAccessToken("14086115-CCwDPShEc0lCUAUIDsMohjkgxQtg4efZ7agPF6P8S")
-      .setOAuthAccessTokenSecret("gEQfu90RIX8sA9oDPyw3mJ2hfwvI6vURdRuNfvZzUcjlB")
-      .build
 }
 
 trait TwitterSource {
   // TODO: this needs to flush all from the queue buffer, not just one by one
-  def tweets(config: TwitterConfig): Process[Task, Status] =
+  def tweetsR(config: TwitterConfig): Process[Task, Status] =
     io.resource(startListenerIntoState(config))(st => Task.delay(st.stream.shutdown)) {
       st => Task.delay(st.queue.take)
     }
@@ -52,4 +47,14 @@ trait TwitterSource {
     TwitterSourceState(queue, stream)
   }
 
+}
+
+trait Configuration {
+  lazy val twitterConfig =
+    new ConfigurationBuilder()
+      .setOAuthConsumerKey("WyZZczRFm9ge3bn9JMMzQ")
+      .setOAuthConsumerSecret("VRY1PtmGVq0jKOakyhn7xNhbVwXF2lp5rsAh6dIg")
+      .setOAuthAccessToken("14086115-CCwDPShEc0lCUAUIDsMohjkgxQtg4efZ7agPF6P8S")
+      .setOAuthAccessTokenSecret("gEQfu90RIX8sA9oDPyw3mJ2hfwvI6vURdRuNfvZzUcjlB")
+      .build
 }
