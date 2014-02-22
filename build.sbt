@@ -4,6 +4,6 @@ libraryDependencies += "org.scalaz.stream" %% "scalaz-stream" % "0.3"
 
 libraryDependencies += "org.twitter4j" % "twitter4j-stream" % "3.0.5"
 
-mainClass in Compile := Some("tweets")
+mainClass in Compile := Some("eg.tweets")
 
 Revolver.settings

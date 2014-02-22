@@ -1,3 +1,4 @@
+package eg
 import scalaz.stream._
 import Process._
 

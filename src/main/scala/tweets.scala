@@ -1,3 +1,4 @@
+package eg
 import java.util.concurrent.LinkedBlockingQueue
 import scalaz._
 import scalaz.concurrent._
