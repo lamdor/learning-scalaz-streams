@@ -12,7 +12,7 @@ object tweets extends App
   
   val collectTweetStats =
     tweetsR(twitterConfig)
-      .map(TwitterStats.makeFromStatus).scanSemigroup // can use scan1Map in newer scalaz-stream
+      .scan1Map(TwitterStats.makeFromStatus)
       .map(_.toString)
       .to(io.stdOutLines)
 
@@ -69,12 +69,14 @@ case class TwitterStats(startDate: DateTime = new DateTime(0),
                  count = count + other.count)
 }
 
-import scalaz.{Equal, Semigroup}
+import scalaz.{Equal, Monoid}
 object TwitterStats {
   def makeFromStatus(status: Status) = TwitterStats(startDate = DateTime.now,
                                                     count = 1)
 
-  implicit val statsSemigroup: Semigroup[TwitterStats] = new Semigroup[TwitterStats] {
+  val empty = TwitterStats(startDate = new DateTime(Long.MaxValue), count = 0)
+  implicit val statsMonoid: Monoid[TwitterStats] = new Monoid[TwitterStats] {
+    val zero = empty
     def append(f1: TwitterStats, f2: => TwitterStats): TwitterStats =
       f1 + f2
   }

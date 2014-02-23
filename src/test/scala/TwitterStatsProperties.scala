@@ -12,5 +12,5 @@ object TwitterStatsProperties extends Properties("TwitterStats") {
                          count = c)
   }
 
-  include(semigroup.laws[TwitterStats])
+  include(monoid.laws[TwitterStats])
 }
