@@ -9,13 +9,14 @@ import twitter4j.conf.{Configuration => TwitterConfig, ConfigurationBuilder}
 object tweets extends App
     with TwitterSource
     with Configuration {
-
-  val outputTweets =
+  
+  val collectTweetStats =
     tweetsR(twitterConfig)
-      .map(_.getText)
+      .map(TwitterStats.makeFromStatus).scanSemigroup // can use scan1Map in newer scalaz-stream
+      .map(_.toString)
       .to(io.stdOutLines)
 
-  outputTweets.run.run
+  collectTweetStats.run.run
 }
 
 trait TwitterSource {
@@ -57,4 +58,27 @@ trait Configuration {
       .setOAuthAccessToken("14086115-CCwDPShEc0lCUAUIDsMohjkgxQtg4efZ7agPF6P8S")
       .setOAuthAccessTokenSecret("gEQfu90RIX8sA9oDPyw3mJ2hfwvI6vURdRuNfvZzUcjlB")
       .build
+}
+
+import com.github.nscala_time.time.Imports._
+
+case class TwitterStats(startDate: DateTime = new DateTime(0),
+                        count: Int = 0) {
+  def +(other: TwitterStats) =
+    TwitterStats(startDate = math.Ordering[DateTime].min(startDate, other.startDate),
+                 count = count + other.count)
+}
+
+import scalaz.{Equal, Semigroup}
+object TwitterStats {
+  def makeFromStatus(status: Status) = TwitterStats(startDate = DateTime.now,
+                                                    count = 1)
+
+  implicit val statsSemigroup: Semigroup[TwitterStats] = new Semigroup[TwitterStats] {
+    def append(f1: TwitterStats, f2: => TwitterStats): TwitterStats =
+      f1 + f2
+  }
+  implicit val statsEqual: Equal[TwitterStats] = new Equal[TwitterStats] {
+    def equal(s1: TwitterStats, s2: TwitterStats): Boolean = s1 == s2
+  }
 }
