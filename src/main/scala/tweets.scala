@@ -1,6 +1,7 @@
 package eg
 import java.util.concurrent.LinkedBlockingQueue
 import scalaz._
+import scalaz.{Equal, Monoid}
 import scalaz.concurrent._
 import scalaz.stream._; import Process._
 import twitter4j._
@@ -69,29 +70,66 @@ trait Configuration {
 import com.github.nscala_time.time.Imports._
 
 case class TwitterStats(startDate: DateTime = new DateTime(0),
-                        count: Int = 0) {
+                        count: Long = 0L,
+                        timeCounts: TimeCountMap = TimeCountMap.empty) {
   def +(other: TwitterStats) =
     TwitterStats(startDate = math.Ordering[DateTime].min(startDate, other.startDate),
-                 count = count + other.count)
+                 count = count + other.count,
+                 timeCounts = TimeCountMap.monoid.append(timeCounts, other.timeCounts))
 }
 
-import scalaz.{Equal, Monoid}
 object TwitterStats {
   def makeFromStatus(status: Status) = TwitterStats(startDate = DateTime.now,
-                                                    count = 1)
+                                                    count = 1,
+                                                    timeCounts = TimeCountMap.unit(new DateTime(status.getCreatedAt)))
 
   val empty = TwitterStats(startDate = new DateTime(Long.MaxValue), count = 0)
   implicit val statsMonoid: Monoid[TwitterStats] = new Monoid[TwitterStats] {
     val zero = empty
     def append(f1: TwitterStats, f2: => TwitterStats): TwitterStats = f1 + f2
   }
-  implicit val statsEqual: Equal[TwitterStats] = new Equal[TwitterStats] {
-    def equal(s1: TwitterStats, s2: TwitterStats): Boolean = s1 == s2
-  }
+  implicit val statsEqual: Equal[TwitterStats] = Equal.equalA[TwitterStats]
   implicit val statsShow: Show[TwitterStats] = new Show[TwitterStats] {
     import org.joda.time.format.DateTimeFormat
     val dateTimeFormat = DateTimeFormat.forStyle("SM")
     override def show(stats: TwitterStats) =
-      "%d tweets since %s".format(stats.count, dateTimeFormat.print(stats.startDate))
+      "%d tweets since %s, %s per second".format(stats.count,
+                                                 dateTimeFormat.print(stats.startDate),
+                                                 stats.timeCounts.rate)
   }
 }
+
+// could just be a newtype
+case class TimeCountMap(buckets: Map[DateTime, Long] = Map.empty) {
+  def getCountFor(dt: DateTime) = buckets.getOrElse(TimeCountMap.truncate(dt), 0)
+  lazy val rate: Double = buckets.values.sum / buckets.size
+}
+
+object TimeCountMap {
+  val empty: TimeCountMap = TimeCountMap()
+
+  def unit(dt: DateTime, count: Long = 1L) = TimeCountMap(Map(truncate(dt) -> count))
+
+  private def truncate(dt: DateTime): DateTime = dt.secondOfMinute.roundFloorCopy
+
+
+  implicit val equals: Equal[TimeCountMap] = Equal.equalA[TimeCountMap]
+  implicit val monoid: Monoid[TimeCountMap] = new Monoid[TimeCountMap] {
+    val zero = empty
+    import scalaz.std._
+    def append(tcm1: TimeCountMap, tcm2: => TimeCountMap): TimeCountMap = {
+      val mergedBuckets = map.mapMonoid(anyVal.longInstance).append(tcm1.buckets, tcm2.buckets)
+      TimeCountMap(keepNewest(mergedBuckets))
+    }
+  }
+
+  private[this] def keepNewest(map: Map[DateTime, Long], toKeep: Int = 120): Map[DateTime, Long] = {
+    if (map.nonEmpty) {
+      val toRemove = map.keys.toList.sorted(math.Ordering[DateTime].reverse).drop(toKeep)
+      map -- toRemove
+    } else map
+  }
+
+
+}
+
