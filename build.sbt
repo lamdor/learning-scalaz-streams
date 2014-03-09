@@ -9,6 +9,8 @@ libraryDependencies ++= Seq(
 
 mainClass in Compile := Some("eg.tweets")
 
+javaOptions ++= Seq("-XX:+UseParNewGC", "-XX:+UseConcMarkSweepGC")
+
 Revolver.settings
 
 libraryDependencies ++= Seq( 
