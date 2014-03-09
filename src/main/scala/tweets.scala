@@ -13,7 +13,7 @@ object tweets extends App
   val collectTweetStats =
     tweetsR(twitterConfig)
       .scan1Map(TwitterStats.makeFromStatus)
-      .map(_.toString)
+      .map(Show[TwitterStats].shows)
       .to(io.stdOutLines)
 
   collectTweetStats.run.run
@@ -87,5 +87,11 @@ object TwitterStats {
   }
   implicit val statsEqual: Equal[TwitterStats] = new Equal[TwitterStats] {
     def equal(s1: TwitterStats, s2: TwitterStats): Boolean = s1 == s2
+  }
+  implicit val statsShow: Show[TwitterStats] = new Show[TwitterStats] {
+    import org.joda.time.format.DateTimeFormat
+    val dateTimeFormat = DateTimeFormat.forStyle("SM")
+    override def show(stats: TwitterStats) =
+      "%d tweets since %s".format(stats.count, dateTimeFormat.print(stats.startDate))
   }
 }
