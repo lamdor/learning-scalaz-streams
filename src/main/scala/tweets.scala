@@ -9,7 +9,7 @@ import twitter4j.conf.{Configuration => TwitterConfig, ConfigurationBuilder}
 object tweets extends App
     with TwitterSource
     with Configuration {
-  
+
   val collectTweetStats =
     tweetsR(twitterConfig)
       .scan1Map(TwitterStats.makeFromStatus)
@@ -20,16 +20,22 @@ object tweets extends App
 }
 
 trait TwitterSource {
-  // TODO: this needs to flush all from the queue buffer, not just one by one
   def tweetsR(config: TwitterConfig): Process[Task, Status] =
     io.resource(startListenerIntoState(config))(st => Task.delay(st.stream.shutdown)) {
-      st => Task.delay(st.queue.take)
-    }
+      st => Task(st.takeAllFromQueue)
+    } flatMap (emitAll)
 
   private[this] case class TwitterSourceState(
     queue: LinkedBlockingQueue[Status],
     stream: TwitterStream
-  )
+  ) {
+    def takeAllFromQueue = {
+      import scala.collection.JavaConverters._
+      val list = new java.util.ArrayList[Status]
+      queue.drainTo(list)
+      list.asScala
+    }
+  }
 
   private[this] def startListenerIntoState(config: TwitterConfig): Task[TwitterSourceState] = Task.delay {
     lazy val stream = new TwitterStreamFactory(config).getInstance
@@ -77,8 +83,7 @@ object TwitterStats {
   val empty = TwitterStats(startDate = new DateTime(Long.MaxValue), count = 0)
   implicit val statsMonoid: Monoid[TwitterStats] = new Monoid[TwitterStats] {
     val zero = empty
-    def append(f1: TwitterStats, f2: => TwitterStats): TwitterStats =
-      f1 + f2
+    def append(f1: TwitterStats, f2: => TwitterStats): TwitterStats = f1 + f2
   }
   implicit val statsEqual: Equal[TwitterStats] = new Equal[TwitterStats] {
     def equal(s1: TwitterStats, s2: TwitterStats): Boolean = s1 == s2
