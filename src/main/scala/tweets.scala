@@ -26,6 +26,9 @@ trait TwitterSource {
       st => Task(st.takeAllFromQueue)
     } flatMap (emitAll)
 
+  def multipleTweetsR(size: Int)(config: TwitterConfig): Process[Task,Status] =
+    List.fill(size)(tweetsR(config)).reduce(_ merge _)
+
   private[this] case class TwitterSourceState(
     queue: LinkedBlockingQueue[Status],
     stream: TwitterStream
