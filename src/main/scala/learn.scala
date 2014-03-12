@@ -6,8 +6,7 @@ object learn extends App {
   val convertAllToCelsius =
     io.linesR("testdata/fahrenheit.txt")
       .filter(line => line.trim.nonEmpty && !line.startsWith("//"))
-      .flatMap(line => tell(line) ++ emitO(fahrenheitToCelsius(line.toDouble).toString))
-      .observeW(io.stdOutLines).stripW.observe(io.stdOutLines)
+      .map(line => fahrenheitToCelsius(line.toDouble).toString)
       .intersperse("\n")
       .pipe(process1.utf8Encode)
       .to(io.fileChunkW("testdata/celsius.txt"))
